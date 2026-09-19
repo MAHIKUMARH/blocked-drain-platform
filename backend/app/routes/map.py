@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -26,26 +27,37 @@ def get_wards(
         ORDER BY ward_number;
     """)
 
-    rows = db.execute(query).fetchall()
-
     features = []
 
-    for row in rows:
+    try:
+        rows = db.execute(query).fetchall()
 
-        features.append({
-            "type": "Feature",
-            "geometry": row.geometry,
-            "properties": {
-                "ward_number": row.ward_number,
-                "ward_name": row.ward_name,
-                "local_body": row.local_body
-            }
-        })
+        for row in rows:
+            geometry = row.geometry
+            if isinstance(geometry, str):
+                try:
+                    geometry = json.loads(geometry)
+                except Exception:
+                    pass
+
+            features.append({
+                "type": "Feature",
+                "geometry": geometry,
+                "properties": {
+                    "ward_number": row.ward_number,
+                    "ward_name": row.ward_name,
+                    "local_body": row.local_body
+                }
+            })
+    except Exception as exc:
+        print(f"Warning: Failed to fetch wards from DB: {exc}")
 
     return {
         "type": "FeatureCollection",
         "features": features
     }
+
+
 @router.get("/reports")
 def get_reports(
     db: Session = Depends(get_db)
@@ -55,6 +67,7 @@ def get_reports(
         SELECT
             id,
             ticket_id,
+            image_path,
             latitude,
             longitude,
             description,
@@ -70,29 +83,32 @@ def get_reports(
         ORDER BY created_at DESC;
     """)
 
-    rows = db.execute(query).fetchall()
-
     reports = []
 
-    for row in rows:
+    try:
+        rows = db.execute(query).fetchall()
 
-        reports.append({
-            "id": row.id,
-            "ticket_id": row.ticket_id,
-            "latitude": row.latitude,
-            "longitude": row.longitude,
-            "description": row.description,
-            "category": row.category,
-            "status": row.status,
-            "ward_number": row.ward_number,
-            "ward_name": row.ward_name,
-            "local_body": row.local_body,
-            "created_at": (
-                row.created_at.isoformat()
-                if row.created_at
-                else None
-            )
-        })
+        for row in rows:
+            reports.append({
+                "id": row.id,
+                "ticket_id": row.ticket_id,
+                "image_path": row.image_path,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                "description": row.description,
+                "category": row.category,
+                "status": row.status,
+                "ward_number": row.ward_number,
+                "ward_name": row.ward_name,
+                "local_body": row.local_body,
+                "created_at": (
+                    row.created_at.isoformat()
+                    if row.created_at
+                    else None
+                )
+            })
+    except Exception as exc:
+        print(f"Warning: Failed to fetch map reports from DB: {exc}")
 
     return {
         "reports": reports,

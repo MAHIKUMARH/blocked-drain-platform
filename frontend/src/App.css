@@ -1,4 +1,4 @@
-﻿* {
+* {
   box-sizing: border-box;
 }
 
@@ -1490,10 +1490,10 @@ textarea,
 /* OPEN */
 
 .legend-dot.open {
-  background: #ff1744;
+  background: #ff7e5f;
 
   box-shadow:
-    0 0 8px rgba(255, 23, 68, 0.8);
+    0 0 8px rgba(255, 126, 95, 0.8);
 }
 
 

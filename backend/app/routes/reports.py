@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 import os
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -14,6 +15,9 @@ router = APIRouter(
     prefix="/api/reports",
     tags=["Reports"],
 )
+
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ==========================================
@@ -40,7 +44,10 @@ def delete_report(
 
     if image_path:
         try:
-            if os.path.isfile(image_path):
+            target_file = UPLOAD_DIR / os.path.basename(image_path)
+            if target_file.is_file():
+                target_file.unlink(missing_ok=True)
+            elif os.path.isfile(image_path):
                 os.remove(image_path)
         except OSError:
             pass
@@ -70,6 +77,9 @@ def find_nearby_reports(
     Resolved reports are excluded because they
     represent issues that have already been resolved.
     """
+
+    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+        raise HTTPException(status_code=400, detail="Invalid latitude or longitude coordinates")
 
     # Prevent unreasonable radius values
     radius = max(10, min(radius, 1000))
@@ -185,18 +195,17 @@ def update_report_status(
     new_status = status_data.status.upper()
 
     if new_status not in allowed_statuses:
-        return {
-            "error": "Invalid status"
-        }
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{new_status}'. Allowed statuses: {', '.join(sorted(allowed_statuses))}"
+        )
 
     report = db.query(Report).filter(
         Report.id == report_id
     ).first()
 
     if not report:
-        return {
-            "error": "Report not found"
-        }
+        raise HTTPException(status_code=404, detail="Report not found")
 
     report.status = new_status
 
@@ -318,78 +327,81 @@ async def create_report(
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+        raise HTTPException(status_code=400, detail="Invalid latitude or longitude coordinates")
 
-    # Create uploads directory
-    os.makedirs("uploads", exist_ok=True)
+    # Generate safe unique filename
+    raw_name = os.path.basename(image.filename or "upload.jpg").replace(" ", "_")
+    now_utc = datetime.now(timezone.utc)
+    filename = f"{int(now_utc.timestamp() * 1000)}_{raw_name}"
 
-    # Generate unique filename
-    filename = (
-        f"{datetime.utcnow().timestamp()}_{image.filename}"
-    )
-
-    file_path = os.path.join(
-        "uploads",
-        filename
-    )
+    file_path = UPLOAD_DIR / filename
 
     # Save uploaded image
+    contents = await image.read()
     with open(file_path, "wb") as buffer:
-        buffer.write(await image.read())
+        buffer.write(contents)
+
+    # Standardized web-safe relative path
+    db_image_path = f"uploads/{filename}"
 
     # ==========================================
     # FIND WARD USING POSTGIS
     # ==========================================
 
-    ward_query = text(
-        """
-        SELECT
-            ward_number,
-            ward_name,
-            local_body
+    ward_num_val = ward_number
+    ward_name_val = ward_name
+    local_body_val = local_body
 
-        FROM wards
-
-        WHERE ST_Covers(
-            boundary,
-            ST_SetSRID(
-                ST_MakePoint(
-                    :longitude,
-                    :latitude
-                ),
-                4326
-            )
-        )
-
-        LIMIT 1;
-        """
-    )
-
-    ward_result = db.execute(
-        ward_query,
-        {
-            "longitude": longitude,
-            "latitude": latitude
-        },
-    ).fetchone()
-
-    if ward_number is not None or ward_name or local_body:
-        if ward_number is None or not ward_name or not local_body:
+    if ward_num_val is not None or ward_name_val or local_body_val:
+        if ward_num_val is None or not ward_name_val or not local_body_val:
             raise HTTPException(
                 status_code=422,
                 detail="ward_number, ward_name, and local_body must be provided together"
             )
-
-    elif ward_result:
-
-        ward_number = ward_result.ward_number
-        ward_name = ward_result.ward_name
-        local_body = ward_result.local_body
-
     else:
+        try:
+            ward_query = text(
+                """
+                SELECT
+                    ward_number,
+                    ward_name,
+                    local_body
 
-        ward_number = None
-        ward_name = None
-        local_body = None
+                FROM wards
+
+                WHERE ST_Covers(
+                    boundary,
+                    ST_SetSRID(
+                        ST_MakePoint(
+                            :longitude,
+                            :latitude
+                        ),
+                        4326
+                    )
+                )
+
+                LIMIT 1;
+                """
+            )
+
+            ward_result = db.execute(
+                ward_query,
+                {
+                    "longitude": longitude,
+                    "latitude": latitude
+                },
+            ).fetchone()
+
+            if ward_result:
+                ward_num_val = ward_result.ward_number
+                ward_name_val = ward_result.ward_name
+                local_body_val = ward_result.local_body
+        except Exception as exc:
+            print(f"Warning: Ward detection failed: {exc}")
+            ward_num_val = None
+            ward_name_val = None
+            local_body_val = None
 
     # ==========================================
     # GENERATE TICKET
@@ -397,7 +409,7 @@ async def create_report(
 
     ticket_id = (
         f"DRN-"
-        f"{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+        f"{now_utc.strftime('%Y%m%d%H%M%S%f')}"
     )
 
     # ==========================================
@@ -406,21 +418,19 @@ async def create_report(
 
     report = Report(
         ticket_id=ticket_id,
-        image_path=file_path,
+        image_path=db_image_path,
         latitude=latitude,
         longitude=longitude,
-        description=description,
+        description=description.strip(),
         category="Drain Blockage",
         status="OPEN",
-        ward_number=ward_number,
-        ward_name=ward_name,
-        local_body=local_body,
+        ward_number=ward_num_val,
+        ward_name=ward_name_val,
+        local_body=local_body_val,
     )
 
     db.add(report)
-
     db.commit()
-
     db.refresh(report)
 
     # ==========================================

@@ -10,6 +10,7 @@ import {
 
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { divIcon } from "leaflet";
+import API_URL from "./api";
 
 import "leaflet/dist/leaflet.css";
 import "react-leaflet-cluster/dist/assets/MarkerCluster.css";
@@ -27,33 +28,25 @@ function MapView() {
   // ==========================================
 
   useEffect(() => {
+    let isMounted = true;
 
     const loadJson = async (url) => {
-
       const response = await fetch(url);
-
       if (!response.ok) {
-        throw new Error(
-          `${url} returned ${response.status}`
-        );
+        throw new Error(`${url} returned ${response.status}`);
       }
-
       return response.json();
     };
 
-
     const loadReports = () =>
-      loadJson(
-        "http://127.0.0.1:8000/api/map/reports"
-      )
+      loadJson(`${API_URL}/api/map/reports`)
         .then((reportData) => {
-          const validReports =
-            (reportData.reports || []).filter(
-              (report) =>
-                Number.isFinite(Number(report.latitude)) &&
-                Number.isFinite(Number(report.longitude))
-            );
-
+          if (!isMounted) return;
+          const validReports = (reportData.reports || []).filter(
+            (report) =>
+              Number.isFinite(Number(report.latitude)) &&
+              Number.isFinite(Number(report.longitude))
+          );
           setReports(validReports);
         })
         .catch((error) => {
@@ -67,73 +60,54 @@ function MapView() {
     window.addEventListener("reports-changed", handleReportsChanged);
 
     Promise.allSettled([
-      loadJson(
-        "http://127.0.0.1:8000/api/map/wards"
-      ),
+      loadJson(`${API_URL}/api/map/wards`),
       loadReports()
     ])
-
-
       .then(([wardResult]) => {
+        if (!isMounted) return;
 
         // ------------------------------------------
         // WARDS
         // ------------------------------------------
-
         if (wardResult.status === "fulfilled") {
-
           const wardData = wardResult.value;
 
           setWards({
             ...wardData,
-
-            features: (wardData.features || []).map(
-              (feature) => ({
-
+            features: (wardData.features || []).map((feature) => {
+              let geometry = feature.geometry;
+              if (typeof geometry === "string") {
+                try {
+                  geometry = JSON.parse(geometry);
+                } catch {
+                  geometry = null;
+                }
+              }
+              return {
                 ...feature,
-
-                geometry:
-                  typeof feature.geometry === "string"
-                    ? JSON.parse(feature.geometry)
-                    : feature.geometry
-
-              })
-            )
+                geometry
+              };
+            }).filter((f) => f.geometry)
           });
-
         } else {
-
           console.error(
             "Unable to load ward boundaries:",
             wardResult.reason
           );
-
         }
 
-
-        // ------------------------------------------
-        // REPORTS
-        // ------------------------------------------
-
         setLoading(false);
-
       })
-
       .catch((error) => {
-
-        console.error(
-          "Map loading error:",
-          error
-        );
-
+        if (!isMounted) return;
+        console.error("Map loading error:", error);
         setLoading(false);
-
       });
 
-      return () => {
-        window.removeEventListener("reports-changed", handleReportsChanged);
-      };
-
+    return () => {
+      isMounted = false;
+      window.removeEventListener("reports-changed", handleReportsChanged);
+    };
   }, []);
 
 
@@ -142,15 +116,10 @@ function MapView() {
   // ==========================================
 
   const wardStyle = () => ({
-
     color: "#6bd6c2",
-
     weight: 1,
-
     fillColor: "#173136",
-
     fillOpacity: 0.25
-
   });
 
 
@@ -159,38 +128,26 @@ function MapView() {
   // ==========================================
 
   const onEachWard = (feature, layer) => {
-
-    const properties =
-      feature.properties || {};
-
+    const properties = feature.properties || {};
 
     layer.bindPopup(`
-
       <div style="
         min-width: 180px;
         line-height: 1.6;
       ">
-
         <strong>
           Ward ${properties.ward_number ?? "N/A"}
         </strong>
-
         <br />
-
         <span>
           ${properties.ward_name ?? "Unnamed Ward"}
         </span>
-
         <br />
-
         <small>
           ${properties.local_body ?? "Local body unavailable"}
         </small>
-
       </div>
-
     `);
-
   };
 
 
@@ -199,24 +156,17 @@ function MapView() {
   // ==========================================
 
   const getMarkerColor = (status) => {
-
     switch (status) {
-
       case "CRITICAL":
-        return "#ff1744";
-
+        return "#ff1744"; // Bright red emergency
       case "IN_PROGRESS":
-        return "#ff9800";
-
+        return "#ff9800"; // Orange
       case "RESOLVED":
-        return "#00c853";
-
+        return "#00c853"; // Green
       case "OPEN":
       default:
-        return "#ff1744";
-
+        return "#ff7e5f"; // Coral / brand primary
     }
-
   };
 
 
@@ -225,24 +175,17 @@ function MapView() {
   // ==========================================
 
   const getMarkerSize = (status) => {
-
     switch (status) {
-
       case "CRITICAL":
         return 22;
-
       case "IN_PROGRESS":
         return 20;
-
       case "RESOLVED":
         return 16;
-
       case "OPEN":
       default:
         return 18;
-
     }
-
   };
 
 
@@ -251,18 +194,11 @@ function MapView() {
   // ==========================================
 
   const createReportIcon = (status) => {
-
-    const color =
-      getMarkerColor(status);
-
-    const size =
-      getMarkerSize(status);
-
+    const color = getMarkerColor(status);
+    const size = getMarkerSize(status);
 
     return divIcon({
-
       className: "report-marker-wrapper",
-
       html: `
         <div
           class="report-marker"
@@ -277,24 +213,10 @@ function MapView() {
           "
         ></div>
       `,
-
-      iconSize: [
-        size,
-        size
-      ],
-
-      iconAnchor: [
-        size / 2,
-        size / 2
-      ],
-
-      popupAnchor: [
-        0,
-        -size / 2
-      ]
-
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+      popupAnchor: [0, -size / 2]
     });
-
   };
 
 
@@ -303,17 +225,11 @@ function MapView() {
   // ==========================================
 
   if (loading) {
-
     return (
-
       <div className="map-loading">
-
         Loading Kochi ward boundaries...
-
       </div>
-
     );
-
   }
 
 
@@ -322,220 +238,127 @@ function MapView() {
   // ==========================================
 
   return (
-
     <div className="map-wrapper">
-
       <MapContainer
-
-        center={[
-          9.9674,
-          76.2673
-        ]}
-
+        center={[9.9674, 76.2673]}
         zoom={13}
-
         className="civic-map"
-
       >
-
-        {/* ======================================
-            OPENSTREETMAP
-        ====================================== */}
-
+        {/* OPENSTREETMAP */}
         <TileLayer
-
-          attribution="
-            &copy; OpenStreetMap contributors
-          "
-
-          url="
-            https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
-          "
-
+          attribution="&copy; OpenStreetMap contributors"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-
-        {/* ======================================
-            WARD BOUNDARIES
-        ====================================== */}
-
+        {/* WARD BOUNDARIES */}
         {wards && (
-
           <GeoJSON
-
             data={wards}
-
             style={wardStyle}
-
             onEachFeature={onEachWard}
-
           />
-
         )}
 
-
-        {/* ======================================
-            REPORT MARKERS + CLUSTERING
-        ====================================== */}
-
+        {/* REPORT MARKERS + CLUSTERING */}
         <MarkerClusterGroup
-
           chunkedLoading
-
           showCoverageOnHover={false}
-
           spiderfyOnMaxZoom={true}
-
           zoomToBoundsOnClick={true}
-
           maxClusterRadius={50}
-
         >
-
           {reports.map((report) => (
-
             <Marker
-
               key={report.id}
-
               position={[
                 Number(report.latitude),
                 Number(report.longitude)
               ]}
-
-              icon={
-                createReportIcon(
-                  report.status
-                )
-              }
-
+              icon={createReportIcon(report.status)}
             >
-
               <Popup>
-
                 <div
                   style={{
                     minWidth: "230px",
                     lineHeight: "1.6"
                   }}
                 >
-
                   {/* TICKET */}
-
-                  <strong
-                    style={{
-                      fontSize: "15px"
-                    }}
-                  >
-
+                  <strong style={{ fontSize: "15px" }}>
                     {report.ticket_id}
-
                   </strong>
-
 
                   <hr />
 
+                  {/* EVIDENCE IMAGE */}
+                  {report.image_path && (
+                    <div style={{ marginTop: "6px", marginBottom: "8px" }}>
+                      <img
+                        src={`${API_URL}/${report.image_path.replace(/\\/g, "/").replace(/^\/+/, "")}`}
+                        alt={`Evidence for ${report.ticket_id}`}
+                        style={{
+                          width: "100%",
+                          maxHeight: "130px",
+                          objectFit: "cover",
+                          borderRadius: "8px",
+                          border: "1px solid rgba(255,255,255,0.15)"
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {/* STATUS */}
-
                   <div>
-
-                    <strong>
-                      Status:
-                    </strong>{" "}
-
+                    <strong>Status:</strong>{" "}
                     <span
                       style={{
                         fontWeight: "700",
-                        color:
-                          getMarkerColor(
-                            report.status
-                          )
+                        color: getMarkerColor(report.status)
                       }}
                     >
-
                       {report.status}
-
                     </span>
-
                   </div>
 
-
                   {/* WARD */}
-
                   <div>
-
-                    <strong>
-                      Ward:
-                    </strong>{" "}
-
+                    <strong>Ward:</strong>{" "}
                     {report.ward_number
                       ? `Ward ${report.ward_number}`
                       : "Not identified"}
-
                   </div>
-
 
                   {/* AREA */}
-
                   <div>
-
-                    <strong>
-                      Area:
-                    </strong>{" "}
-
-                    {report.ward_name ||
-                      "Not available"}
-
+                    <strong>Area:</strong>{" "}
+                    {report.ward_name || "Not available"}
                   </div>
 
-
                   {/* LOCALITY */}
-
                   {report.local_body && (
-
                     <div>
-
-                      <strong>
-                        Locality:
-                      </strong>{" "}
-
+                      <strong>Locality:</strong>{" "}
                       {report.local_body}
-
                     </div>
-
                   )}
 
-
                   {/* DESCRIPTION */}
-
                   <p
                     style={{
                       marginTop: "10px",
                       marginBottom: "8px"
                     }}
                   >
-
-                    {report.description ||
-                      "No description provided."}
-
+                    {report.description || "No description provided."}
                   </p>
 
-
                   {/* CATEGORY */}
-
                   <small>
-
-                    {report.category ||
-                      "Drain Blockage"}
-
+                    {report.category || "Drain Blockage"}
                   </small>
 
-
                   {/* DATE */}
-
                   {report.created_at && (
-
                     <div
                       style={{
                         marginTop: "8px",
@@ -543,93 +366,43 @@ function MapView() {
                         color: "#777"
                       }}
                     >
-
                       Reported:{" "}
-
-                      {new Date(
-                        report.created_at
-                      ).toLocaleString()}
-
+                      {new Date(report.created_at).toLocaleString()}
                     </div>
-
                   )}
-
                 </div>
-
               </Popup>
-
             </Marker>
-
           ))}
-
         </MarkerClusterGroup>
-
-
       </MapContainer>
 
-
-      {/* ======================================
-          MAP LEGEND
-      ====================================== */}
-
+      {/* MAP LEGEND */}
       <div className="map-legend">
-
-        <div className="legend-title">
-          Report Status
-        </div>
-
+        <div className="legend-title">Report Status</div>
 
         <div className="legend-item">
-
-          <span
-            className="legend-dot open"
-          ></span>
-
+          <span className="legend-dot open"></span>
           Open
-
         </div>
 
-
         <div className="legend-item">
-
-          <span
-            className="legend-dot progress"
-          ></span>
-
+          <span className="legend-dot progress"></span>
           In Progress
-
         </div>
 
-
         <div className="legend-item">
-
-          <span
-            className="legend-dot resolved"
-          ></span>
-
+          <span className="legend-dot resolved"></span>
           Resolved
-
         </div>
-
 
         <div className="legend-item">
-
-          <span
-            className="legend-dot critical"
-          ></span>
-
+          <span className="legend-dot critical"></span>
           Critical
-
         </div>
-
       </div>
-
-
     </div>
-
   );
-
 }
-
 
 export default MapView;

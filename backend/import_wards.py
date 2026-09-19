@@ -1,8 +1,13 @@
 import json
 import os
+from pathlib import Path
 import psycopg2
 from dotenv import load_dotenv
 
+# Robustly load environment variables
+script_dir = Path(__file__).resolve().parent
+load_dotenv(script_dir / ".env")
+load_dotenv(script_dir.parent / ".env")
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -14,7 +19,7 @@ if not DATABASE_URL:
 connection = psycopg2.connect(DATABASE_URL)
 cursor = connection.cursor()
 
-# Create wards table
+# Create wards table if it does not exist
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS wards (
         id SERIAL PRIMARY KEY,
@@ -26,15 +31,13 @@ cursor.execute("""
     );
 """)
 
-# Remove previously imported data
-cursor.execute("DELETE FROM wards;")
+# Locate GeoJSON file
+file_path = script_dir.parent / "gis" / "kochi" / "Kochi_Wards.geojson"
+if not file_path.exists():
+    file_path = script_dir / "gis" / "kochi" / "Kochi_Wards.geojson"
 
-# GeoJSON file
-file_path = os.path.join(
-    "gis",
-    "kochi",
-    "Kochi_Wards.geojson"
-)
+if not file_path.exists():
+    raise FileNotFoundError(f"GeoJSON file not found at {file_path}")
 
 # Load entire GeoJSON
 with open(file_path, "r", encoding="utf-8") as file:
@@ -45,14 +48,15 @@ if data.get("type") != "FeatureCollection":
     raise ValueError("GeoJSON is not a FeatureCollection")
 
 features = data.get("features", [])
+print(f"Total features found in GeoJSON: {len(features)}")
 
-print(f"Total features found: {len(features)}")
+# Remove previously imported data
+cursor.execute("DELETE FROM wards;")
 
 imported = 0
 skipped = 0
 
 for index, feature in enumerate(features, start=1):
-
     properties = feature.get("properties") or {}
     geometry = feature.get("geometry")
 
@@ -63,16 +67,12 @@ for index, feature in enumerate(features, start=1):
         or geometry is None
     ):
         skipped += 1
-        print(
-            f"Skipping feature {index}: "
-            f"Ward_No/Ward_Name/geometry missing"
-        )
         continue
 
     ward_number = int(properties["Ward_No"])
     ward_name = properties["Ward_Name"]
 
-    # Insert ward
+    # Insert ward using ST_Multi to support both Polygon and MultiPolygon column types
     cursor.execute(
         """
         INSERT INTO wards (
@@ -85,9 +85,11 @@ for index, feature in enumerate(features, start=1):
             %s,
             %s,
             %s,
-            ST_SetSRID(
-                ST_GeomFromGeoJSON(%s),
-                4326
+            ST_Multi(
+                ST_SetSRID(
+                    ST_GeomFromGeoJSON(%s),
+                    4326
+                )
             )
         );
         """,
@@ -109,7 +111,6 @@ cursor.execute("""
 """)
 
 connection.commit()
-
 cursor.close()
 connection.close()
 

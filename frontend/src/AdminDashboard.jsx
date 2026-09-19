@@ -1,3 +1,4 @@
+import API_URL from "./api";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -57,15 +58,15 @@ function AdminDashboard() {
       ] = await Promise.all([
 
         fetch(
-          "http://127.0.0.1:8000/api/reports/stats"
+          `${API_URL}/api/reports/stats`
         ),
 
         fetch(
-          "http://127.0.0.1:8000/api/reports/ward-stats"
+          `${API_URL}/api/reports/ward-stats`
         ),
 
         fetch(
-          "http://127.0.0.1:8000/api/reports/"
+          `${API_URL}/api/reports/`
         )
 
       ]);
@@ -102,11 +103,11 @@ function AdminDashboard() {
         await reportsResponse.json();
 
 
-      setStats(statsData);
+      setStats(statsData && typeof statsData === "object" ? statsData : null);
 
-      setWardStats(wardData);
+      setWardStats(Array.isArray(wardData) ? wardData : []);
 
-      setReports(reportsData);
+      setReports(Array.isArray(reportsData) ? reportsData : []);
 
       setError(null);
 
@@ -133,15 +134,22 @@ function AdminDashboard() {
 
 
   // ==========================================
-  // INITIAL LOAD
+  // INITIAL LOAD & REAL-TIME EVENT SYNC
   // ==========================================
 
   useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect -- async data fetch, setState is never called synchronously
+    void loadDashboardData();
 
-    // Dashboard state is populated from the API request started here.
-    // eslint-disable-next-line react/set-state-in-effect
-    loadDashboardData();
+    const handleReportsChanged = () => {
+      void loadDashboardData();
+    };
 
+    window.addEventListener("reports-changed", handleReportsChanged);
+
+    return () => {
+      window.removeEventListener("reports-changed", handleReportsChanged);
+    };
   }, []);
 
 
@@ -163,7 +171,7 @@ function AdminDashboard() {
 
       const response = await fetch(
 
-        `http://127.0.0.1:8000/api/reports/${selectedReport.id}/status`,
+        `${API_URL}/api/reports/${selectedReport.id}/status`,
 
         {
           method: "PATCH",
@@ -186,6 +194,7 @@ function AdminDashboard() {
       if (!response.ok) {
 
         throw new Error(
+          data.detail ||
           data.error ||
           "Failed to update status"
         );
@@ -203,6 +212,9 @@ function AdminDashboard() {
 
       }));
 
+
+      // Notify map and other listeners of the status change
+      window.dispatchEvent(new Event("reports-changed"));
 
       // Refresh everything
 
@@ -245,7 +257,7 @@ function AdminDashboard() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/reports/${selectedReport.id}`,
+        `${API_URL}/api/reports/${selectedReport.id}`,
         { method: "DELETE" }
       );
 
@@ -618,9 +630,7 @@ function AdminDashboard() {
 
               type="text"
 
-              placeholder="
-                Search ticket, ward or description...
-              "
+              placeholder="Search ticket, ward or description..."
 
               value={search}
 
@@ -941,10 +951,10 @@ function AdminDashboard() {
             <tbody>
 
 
-              {wardStats.map((ward) => (
+              {wardStats.map((ward, index) => (
 
                 <tr
-                  key={ward.ward_number}
+                  key={`${ward.ward_number ?? "unassigned"}-${ward.ward_name ?? ""}-${index}`}
                 >
 
                   <td>
@@ -1135,9 +1145,12 @@ function AdminDashboard() {
 
                 <div className="modal-image-container">
                   <img
-                    src={`http://127.0.0.1:8000/${selectedReport.image_path.replace(/\\/g, "/")}`}
+                    src={`${API_URL}/${selectedReport.image_path.replace(/\\/g, "/").replace(/^\/+/, "")}`}
                     alt={`Evidence for ${selectedReport.ticket_id}`}
                     className="report-evidence-image"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                   />
                 </div>
 

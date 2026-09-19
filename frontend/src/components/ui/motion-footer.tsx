@@ -126,6 +126,7 @@ function MagneticButton({
   }, []);
 
   const Component = as;
+  const buttonType = as === "button" ? (props.type as "button" | "submit" | "reset" | undefined) ?? "button" : undefined;
 
   return (
     <Component
@@ -133,6 +134,7 @@ function MagneticButton({
         localRef.current = node as HTMLElement | null;
       }}
       className={cn("footer-pill cursor-pointer", className)}
+      type={buttonType}
       {...props}
     >
       {children}

@@ -1,3 +1,4 @@
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -7,7 +8,10 @@ from .routes.reports import router as reports_router
 from .routes.map import router as map_router
 
 # Create database tables
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as exc:
+    print(f"Warning: Database table creation failed on startup: {exc}")
 
 
 app = FastAPI(
@@ -41,10 +45,14 @@ app.add_middleware(
 # STATIC FILES
 # -----------------------------
 
-# Serve uploaded report evidence images
+# Serve uploaded report evidence images from backend/uploads
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 app.mount(
     "/uploads",
-    StaticFiles(directory="uploads"),
+    StaticFiles(directory=str(UPLOAD_DIR)),
     name="uploads"
 )
 

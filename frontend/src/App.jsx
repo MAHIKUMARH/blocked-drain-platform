@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import {
   Camera,
@@ -13,6 +13,7 @@ import {
 
 import MapView from "./MapView";
 import AdminDashboard from "./AdminDashboard";
+import API_URL from "./api";
 import Auralis from "@/components/ui/auralis";
 import { CinematicFooter } from "@/components/ui/motion-footer";
 import { HoverHighlightText } from "@/components/ui/hover-highlight-text";
@@ -120,7 +121,7 @@ function App() {
 }
 
 function ReportForm() {
-
+  const fileInputRef = useRef(null);
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
 
@@ -226,7 +227,7 @@ function ReportForm() {
       setError(null);
 
       const response = await axios.get(
-        "http://127.0.0.1:8000/api/reports/nearby",
+        `${API_URL}/api/reports/nearby`,
         {
           params: {
             latitude: location.latitude,
@@ -312,7 +313,7 @@ function ReportForm() {
       setSubmitting(true);
 
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/reports/",
+        `${API_URL}/api/reports/`,
         formData
       );
 
@@ -322,6 +323,9 @@ function ReportForm() {
       setImage(null);
       setPreview(null);
       setDescription("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
       setLocation({
         latitude: "",
@@ -487,6 +491,7 @@ function ReportForm() {
                 )}
 
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
@@ -876,9 +881,13 @@ function ReportForm() {
           </span>
 
           <span>
-            {Number(success.latitude).toFixed(6)}
+            {Number.isFinite(Number(success.latitude))
+              ? Number(success.latitude).toFixed(6)
+              : success.latitude || "N/A"}
             {" , "}
-            {Number(success.longitude).toFixed(6)}
+            {Number.isFinite(Number(success.longitude))
+              ? Number(success.longitude).toFixed(6)
+              : success.longitude || "N/A"}
           </span>
 
         </div>
