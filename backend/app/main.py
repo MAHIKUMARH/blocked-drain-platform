@@ -47,7 +47,7 @@ app.add_middleware(
 
 # Serve uploaded report evidence images from backend/uploads
 BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR = BASE_DIR / "/tmp/uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount(
