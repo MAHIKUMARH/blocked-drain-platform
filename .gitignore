@@ -1,0 +1,35 @@
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local runtime data
+backend/uploads/*
+!backend/uploads/.gitkeep
+*.sqlite
+*.sqlite3
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Test and coverage output
+.coverage
+htmlcov/
+coverage/

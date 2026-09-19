@@ -1,0 +1,96 @@
+@import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Montserrat:wght@400;500;600;700;800&family=Ubuntu+Mono&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --card: #ffffff;
+  --ring: #ff7e5f;
+  --input: #ffe0d6;
+  --muted: #fff0eb;
+  --accent: #feb47b;
+  --border: #ffe0d6;
+  --radius: 0.625rem;
+  --chart-1: #ff7e5f;
+  --chart-2: #feb47b;
+  --chart-3: #ffcaa7;
+  --chart-4: #ffad8f;
+  --chart-5: #ce6a57;
+  --popover: #ffffff;
+  --primary: #ff7e5f;
+  --sidebar: #fff0eb;
+  --font-mono: "Ubuntu Mono", monospace;
+  --font-sans: "Montserrat", sans-serif;
+  --font-display: "Galgo Condensed", "Arial Narrow", sans-serif;
+  --secondary: #ffedea;
+  --background: #fff9f5;
+  --font-serif: "Merriweather", serif;
+  --foreground: #3d3436;
+  --destructive: #e63946;
+  --shadow-blur: 12px;
+  --shadow-color: hsl(0 0% 0%);
+  --sidebar-ring: #ff7e5f;
+  --shadow-spread: -3px;
+  --shadow-opacity: 0.09;
+  --sidebar-accent: #feb47b;
+  --sidebar-border: #ffe0d6;
+  --card-foreground: #3d3436;
+  --shadow-offset-x: 0px;
+  --shadow-offset-y: 6px;
+  --sidebar-primary: #ff7e5f;
+  --muted-foreground: #78716c;
+  --accent-foreground: #3d3436;
+  --popover-foreground: #3d3436;
+  --primary-foreground: #ffffff;
+  --sidebar-foreground: #3d3436;
+  --secondary-foreground: #b35340;
+  --destructive-foreground: #ffffff;
+  --sidebar-accent-foreground: #3d3436;
+  --sidebar-primary-foreground: #ffffff;
+}
+
+.dark {
+  --card: #1c3034;
+  --ring: #6bd6c2;
+  --input: #29464a;
+  --muted: #17282d;
+  --accent: #9be7d8;
+  --border: #31545a;
+  --popover: #1c3034;
+  --primary: #6bd6c2;
+  --sidebar: #101b20;
+  --secondary: #29464a;
+  --background: #101b20;
+  --foreground: #e8f4f1;
+  --destructive: #e63946;
+  --sidebar-ring: #6bd6c2;
+  --sidebar-accent: #9be7d8;
+  --sidebar-border: #31545a;
+  --card-foreground: #e8f4f1;
+  --sidebar-primary: #6bd6c2;
+  --muted-foreground: #a9c3bf;
+  --accent-foreground: #101b20;
+  --popover-foreground: #e8f4f1;
+  --primary-foreground: #ffffff;
+  --sidebar-foreground: #e8f4f1;
+  --secondary-foreground: #f2e9e4;
+  --destructive-foreground: #ffffff;
+  --sidebar-accent-foreground: #101b20;
+  --sidebar-primary-foreground: #ffffff;
+}
+
+html {
+  background: var(--background);
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+  scrollbar-color: rgba(107, 214, 194, 0.8) rgba(16, 27, 32, 0.7);
+  scrollbar-width: thin;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
