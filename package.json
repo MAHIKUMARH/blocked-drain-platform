@@ -1,0 +1,10 @@
+{
+  "name": "blocked-drain-platform",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter frontend dev",
+    "build": "pnpm --filter frontend build",
+    "preview": "pnpm --filter frontend preview",
+    "lint": "pnpm --filter frontend lint"
+  }
+}
