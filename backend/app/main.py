@@ -52,7 +52,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount(
     "/uploads",
-    StaticFiles(directory=str(UPLOAD_DIR)),
+    StaticFiles(directory="/tmp/uploads"),
     name="uploads"
 )
 

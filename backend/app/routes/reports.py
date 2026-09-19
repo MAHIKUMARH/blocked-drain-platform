@@ -16,7 +16,7 @@ router = APIRouter(
     tags=["Reports"],
 )
 
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "/tmp/uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
